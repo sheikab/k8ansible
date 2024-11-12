@@ -1,0 +1,26 @@
+---
+- name: Delete  Application from Kubernetes
+  hosts: localhost
+  tasks:
+
+    - name: Delete all Statefulset from specified namespace
+      k8s:
+         api_version: apps/v1
+         namespace: psg
+         kind: StatefulSet
+         delete_all: true
+         state: absent
+    - name: Remove an existing Service object
+      k8s:
+        state: absent
+        api_version: v1
+        kind: Service
+        namespace: psg
+        name: postgresql
+
+    - name: delete a k8s namespace
+      k8s:
+        name: psg
+        api_version: v1
+        kind: Namespace
+        state: absent

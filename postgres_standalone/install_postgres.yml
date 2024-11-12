@@ -1,0 +1,61 @@
+---
+- name: Install and configure PostgreSQL on Red Hat
+  hosts: amz_linux
+  become: true
+
+  vars:
+    postgres_version: "13"  # Change this to your desired version
+    postgres_password: "Postgres@456"
+  tasks:
+    - name: Install PostgreSQL repository
+      ansible.builtin.package:
+        name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+        state: present
+
+    - name: Install Python `psycopg2` library on Red Hat/CentOS
+      ansible.builtin.yum:
+        name: python3-psycopg2
+        state: present
+ 
+    - name: Install PostgreSQL
+      ansible.builtin.package:
+        name: "postgresql{{ postgres_version }}, postgresql{{ postgres_version }}-server"
+        state: present
+
+    - name: Initialize PostgreSQL database
+      command: /usr/pgsql-{{ postgres_version }}/bin/postgresql-{{ postgres_version }}-setup initdb
+      args:
+        creates: /var/lib/pgsql/{{ postgres_version }}/data/PG_VERSION
+
+    - name: Ensure PostgreSQL is started and enabled on boot
+      service:
+        name: postgresql-{{ postgres_version }}
+        state: started
+        enabled: yes
+
+    - name: Set PostgreSQL password for the "postgres" user
+      become: true
+      become_user: postgres
+      ansible.builtin.shell: |
+        psql -c "ALTER USER postgres WITH PASSWORD 'test@123';"
+
+    - name: Configure PostgreSQL to listen on all interfaces
+      lineinfile:
+        path: /var/lib/pgsql/{{ postgres_version }}/data/postgresql.conf
+        regexp: '^#listen_addresses ='
+        line: "listen_addresses = '*'"
+      notify: restart postgresql
+
+    - name: Allow remote connections to PostgreSQL
+      lineinfile:
+        path: /var/lib/pgsql/{{ postgres_version }}/data/pg_hba.conf
+        line: "host all all 0.0.0.0/0 md5"
+        create: yes
+      notify: restart postgresql
+
+  handlers:
+    - name: restart postgresql
+      service:
+        name: postgresql-{{ postgres_version }}
+        state: restarted
+

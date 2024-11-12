@@ -1,0 +1,35 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: jenkin-gateway # change name and namespace
+  namespace: k8
+spec:
+  selector:
+    istio: ingressgateway 
+  servers:
+  - port:
+      number: 80
+      name: http-test
+      protocol: HTTP
+    hosts:
+    - jenkin.k8.caas.com # replace with your hostname
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: jenkin-vs # change name and namespace
+  namespace: k8
+spec:
+  hosts:
+  - "jenkin.k8.caas.com" # replace the hostname again 
+  gateways:
+  - test-gateway
+  http:
+  - match:
+    - uri:
+        prefix: / # replace with path 
+    route:
+    - destination:
+        port:
+          number: 8080 # replace with port of your k8s server
+        host: jenkin-service.k8.svc.cluster.local # replace with FQDN of your k8s service

@@ -1,0 +1,6 @@
+[amz_linux]
+localhost
+
+[amz_linux:vars]
+ansible_user=caasops
+ansible_python_interpreter=/bin/python2.7

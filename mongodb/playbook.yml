@@ -1,0 +1,26 @@
+---
+- name: Deploy MongoDB Replica Set on Kubernetes
+  hosts: localhost
+  tasks:
+
+    - name: Apply MongoDB Service Manifest
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', './mongo-service.yaml') }}"
+      delegate_to: localhost
+
+    - name: Apply MongoDB StatefulSet Manifest
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', './mongo-statefulset.yaml') }}"
+      delegate_to: localhost
+
+    - name: Wait for MongoDB pods to be ready
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: mongo-rs
+        label_selectors:
+          - app=mongo
+      register: mongo_pods
+

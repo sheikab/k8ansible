@@ -1,0 +1,25 @@
+---
+- name: Deploy Application to Kubernetes
+  hosts: localhost
+  tasks:
+    - name: Create a k8s namespace
+      kubernetes.core.k8s:
+        name: k8
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Create Kubernetes Deployment
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', 'app_k8.yaml') }}"
+
+    - name: Create Kubernetes Service
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', 'service_k8.yaml') }}"
+
+    - name: Create Kubernetes vsgw
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('file', 'vsgw_k8.yaml') }}"

@@ -1,0 +1,107 @@
+---
+- name: Deploy PostgreSQL StatefulSet with 3 replicas in Kubernetes
+  hosts: localhost
+  become: false
+  vars:
+    postgres_version: "13"
+    postgres_user: "postgres"
+    postgres_password: "test@123"  # Replace with a secure password
+    postgres_database: "mydb"
+    storage_size: "10Gi"  # Persistent storage size for each replica
+
+  tasks:
+    - name: Create a k8s namespace
+      kubernetes.core.k8s:
+        name: psg
+        api_version: v1
+        kind: Namespace
+        state: present
+                      
+    - name: Apply Kubernetes configuration from YAML file
+      community.kubernetes.k8s:
+        state: present  # Use 'absent' to delete resources
+        src: psql_client.yaml  # Path to your YAML file
+
+    - name: Create Persistent Volume Claims for PostgreSQL data
+      community.kubernetes.k8s:
+        kubeconfig: /root/.k8ansible/postgres_k8/admin.conf
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: pgdata-pvc-{{ item }}
+            namespace: psg
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: "{{ storage_size }}"
+      loop: "{{ range(1, 4) | list }}"  # Create 3 PVCs for 3 replicas
+      register: pvc_created
+
+    - name: Create PostgreSQL StatefulSet with 3 replicas
+      community.kubernetes.k8s:
+        kubeconfig: /root/.k8ansible/postgres_k8/admin.conf
+        definition:
+          apiVersion: apps/v1
+          kind: StatefulSet
+          metadata:
+            name: postgresql
+            namespace: psg
+            labels:
+              app: postgresql
+          spec:
+            serviceName: postgresql
+            replicas: 3  # 3 replicas
+            selector:
+              matchLabels:
+                app: postgresql
+            template:
+              metadata:
+                labels:
+                  app: postgresql
+              spec:
+                containers:
+                  - name: postgresql
+                    image: "postgres:{{ postgres_version }}"
+                    env:
+                      - name: POSTGRES_USER
+                        value: "{{ postgres_user }}"
+                      - name: POSTGRES_PASSWORD
+                        value: "{{ postgres_password }}"
+                      - name: POSTGRES_DB
+                        value: "{{ postgres_database }}"
+                    ports:
+                      - containerPort: 5432
+                    volumeMounts:
+                      - name: pgdata
+                        mountPath: /var/lib/postgresql/data
+                        subPath: pgdata
+            volumeClaimTemplates:
+              - metadata:
+                  name: pgdata
+                spec:
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: "{{ storage_size }}"
+
+    - name: Expose PostgreSQL StatefulSet as a Service
+      community.kubernetes.k8s:
+        kubeconfig: /root/.k8ansible/postgres_k8/admin.conf
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: postgresql
+            namespace: psg
+          spec:
+            ports:
+              - port: 5432
+                targetPort: 5432
+            clusterIP: None  # Required for StatefulSet headless service
+            selector:
+              app: postgresql
+
